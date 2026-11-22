@@ -19,6 +19,7 @@ Use the language menu to choose Simplified Chinese, Traditional Chinese, or Engl
 ## Features
 
 - Create invoices, import or export CSV files, and generate downloadable payment pages. CSV import accepts templates in all three languages.
+- Search by invoice ID, customer, or receiving address, and filter for partially paid or overpaid invoices. Edit customer names at any time, and change the amount or receiving address before linking a payment.
 - Verify transactions by hash or signature in batches, or search for recent payments by receiving address.
 - Track split payments and overpayments, unlink an individual payment, record exceptions, and review recent activity.
 - Keep separate ledgers by network and asset, with JSON backup and restore.

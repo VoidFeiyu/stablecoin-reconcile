@@ -441,7 +441,41 @@ const Ledger = (() => {
     });
   }
 
-  function matchBill(db, mode, id, transfer, expectedReceived) {
+  function updateBill(db, original, fields) {
+    return new Promise((resolve, reject) => {
+      const {mode, id} = original;
+      const {customer, units, address} = bill(mode, [id, ...fields]);
+      const transaction = db.transaction(["invoices", "activity"], "readwrite");
+      const invoices = transaction.objectStore("invoices");
+      let reason = "";
+      let changed = false;
+      const request = invoices.get([mode, id]);
+      request.onsuccess = () => {
+        const current = request.result;
+        if (!current || current.customer !== original.customer ||
+          current.units !== original.units || current.address !== original.address) {
+          reason = t("账单已更新。请关闭编辑窗口后重新打开。");
+          transaction.abort();
+          return;
+        }
+        const paymentDetailsChanged = current.units !== units || current.address !== address;
+        if (paymentDetailsChanged && paymentsFor(current).length) {
+          reason = t("账单已有付款关联，金额和收款地址已锁定。");
+          transaction.abort();
+          return;
+        }
+        changed = paymentDetailsChanged || current.customer !== customer;
+        if (changed) {
+          invoices.put({...current, customer, units, address});
+          recordActivity(transaction, mode, "已编辑账单 " + id);
+        }
+      };
+      transaction.oncomplete = () => resolve(changed);
+      transaction.onabort = () => reject(new Error(reason || t("账单编辑未保存，请重试。")));
+    });
+  }
+
+  function matchBill(db, mode, id, transfer, expectedReceived, expectedUnits) {
     return new Promise((resolve, reject) => {
       const transaction = db.transaction(["invoices", "receipts", "assignments", "activity"], "readwrite");
       const invoices = transaction.objectStore("invoices");
@@ -451,6 +485,7 @@ const Ledger = (() => {
       receipt.onsuccess = () => {
         const item = request.result;
         if (!item || !canMatch(item, transfer) || receipt.result?.exception ||
+          (expectedUnits !== undefined && item.units !== expectedUnits) ||
           (expectedReceived !== undefined && billTotals(item).received.toString() !== expectedReceived)) {
           reason = t("账单状态已改变，或地址和金额不一致。请重新核验。");
           transaction.abort();
@@ -904,7 +939,7 @@ const Ledger = (() => {
     inspectNode, makeCsv, matchBatch, matchBill, networkCatalog, networkForWorkspace, networks, openDatabase, parseHashes,
     normalizeAddress, normalizedTransactionId, paymentKey, paymentsFor, queryTransaction, readActivity, readBills, readWorkspace,
     recordActivity, saveBills, saveReceipts, scanAddress, validTransactionId,
-    setException, splitDemoTransfers, suggestMatches, unmatchBill, workspaceForNetwork};
+    setException, splitDemoTransfers, suggestMatches, unmatchBill, updateBill, workspaceForNetwork};
 })();
 
 if (typeof module !== "undefined") module.exports = Ledger;

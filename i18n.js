@@ -353,6 +353,22 @@ const I18n = (() => {
     "标记异常 {0} · {1}": ["Flagged {0} · {1}", "標記異常 {0} · {1}"],
     "恢复待匹配 {0}": ["Moved {0} to unmatched", "還原待配對 {0}"],
     "从备份恢复 {0} 条记录": ["Restored {0} records from backup", "從備份還原 {0} 條紀錄"],
+    "导出全部 CSV": ["Export all to CSV", "匯出全部 CSV"],
+    "搜索账单": ["Search invoices", "搜尋帳單"],
+    "按账单号、客户或收款地址搜索": ["Search by invoice ID, customer, or receiving address", "依帳單號、客戶或收款地址搜尋"],
+    "显示 {0} / {1} 张账单": ["Showing {0} of {1} invoices", "顯示 {0} / {1} 張帳單"],
+    "没有找到符合搜索条件的账单。": ["No invoices match your search.", "找不到符合搜尋條件的帳單。"],
+    "编辑": ["Edit", "編輯"],
+    "编辑账单": ["Edit invoice", "編輯帳單"],
+    "编辑账单 {0}": ["Edit invoice {0}", "編輯帳單 {0}"],
+    "账单已有付款关联，金额和收款地址已锁定。": ["This invoice has linked payments. The amount and receiving address are locked.", "這張帳單已有關聯的付款，金額和收款地址已鎖定。"],
+    "修改金额或收款地址后，请重新生成付款页并发给客户。": ["If you change the amount or receiving address, generate a new payment page and send it to your customer.", "修改金額或收款地址後，請重新產生付款頁並傳給客戶。"],
+    "账单已更新。请关闭编辑窗口后重新打开。": ["This invoice was updated. Close the editor and reopen the invoice.", "這張帳單已更新。請關閉編輯視窗後重新開啟。"],
+    "账单编辑未保存，请重试。": ["Could not save the invoice changes. Try again.", "無法儲存帳單變更，請重試。"],
+    "账单所在的工作区已切换，请重新打开账单。": ["The workspace has changed. Reopen the invoice to continue editing.", "工作區已切換，請重新開啟帳單。"],
+    "已更新账单 {0}。": ["Invoice {0} updated.", "已更新帳單 {0}。"],
+    "账单没有变更。": ["No invoice changes to save.", "帳單沒有變更。"],
+    "已编辑账单 {0}": ["Edited invoice {0}", "已編輯帳單 {0}"],
   };
 
   function translator(language, catalog) {
@@ -418,6 +434,7 @@ const I18n = (() => {
   function activity(value) {
     const formats = [
       [/^新增账单 (.+)$/, "新增账单 {0}"],
+      [/^已编辑账单 ([\s\S]+)$/, "已编辑账单 {0}"],
       [/^导入 (\d+) 张账单$/, "导入 {0} 张账单"],
       [/^关联账单 (.+) · (.+)$/, "关联账单 {0} · {1}"],
       [/^批量关联 (.+)$/, "批量关联 {0}"],

@@ -68,6 +68,8 @@ h1 { font-size: clamp(2rem, 4vw, 2.6rem); letter-spacing: -.04em; line-height: 1
 .verify { max-width: 850px; }
 .panel-heading { padding: 19px 18px 13px; }
 .panel-heading p { font-size: .875rem; }
+.invoice-search { padding: 0 18px 12px; }
+.invoice-search input { max-width: 28rem; }
 h2 { font-size: 1.18rem; }
 .tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 16px 12px; }
 .tabs button[aria-pressed="true"] { color: var(--teal-dark); background: #e2f1eb; font-weight: 650; }
@@ -80,7 +82,7 @@ td strong, td small { display: block; overflow-wrap: anywhere; }
 td small { color: var(--subtle); margin-top: 4px; font-size: .8rem; }
 td:nth-child(2) { font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 td:last-child { padding-right: 16px; text-align: right; }
-.row-actions { display: grid; justify-items: end; gap: 4px; white-space: nowrap; }
+.row-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 4px 12px; }
 .empty { padding: 24px 18px; color: var(--subtle); text-align: center !important; }
 .badge { display: inline-block; white-space: nowrap; border-radius: 20px; color: #754b17; background: #fff2db; padding: 4px 8px; font-size: .8rem; }
 .paid { color: #0d5e4d; background: #e0f4ec; }
@@ -97,6 +99,7 @@ textarea { resize: vertical; min-height: 4.8rem; }
 input[name="address"], #hash, .token-details { font-family: ui-monospace, Consolas, monospace; font-size: .875rem; }
 label { display: block; font-size: .875rem; font-weight: 650; }
 label input { display: block; margin-top: 5px; font-weight: 400; }
+#bill-form input[readonly] { background: #f2f6f5; }
 .text-btn { background: transparent; color: var(--teal); border: none; font-size: .875rem; text-decoration: underline; text-underline-offset: 3px; padding: 3px 0; width: fit-content; }
 .text-btn:hover, a:hover { color: #087a63; }
 .feedback { color: #26564e; font-size: .875rem; line-height: 1.55; overflow-wrap: anywhere; }

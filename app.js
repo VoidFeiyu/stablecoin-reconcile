@@ -13,6 +13,7 @@ const networkSelect = byId("network-select");
 const assetSelect = byId("asset-select");
 const assetShortcuts = document.querySelectorAll("[data-network][data-asset]");
 const filters = document.querySelectorAll("[data-filter]");
+const billSearch = byId("bill-search");
 const viewButtons = document.querySelectorAll("[data-view]");
 const rows = byId("rows");
 const transferList = byId("transfers");
@@ -46,6 +47,7 @@ let queryVersion = 0;
 let view = "batch";
 const inboxPageSize = 20;
 let inboxLimit = inboxPageSize;
+let editingBill;
 let undoItem;
 let paymentRequest;
 let receiptBill = "";
@@ -92,18 +94,26 @@ function moneyLabel(units, workspace = mode) {
 function renderBills() {
   const bills = items.map(item => ({item, total: Ledger.billTotals(item)}));
   const open = bills.filter(({total}) => total.remaining > 0n);
-  const paid = bills.filter(({total}) => !total.remaining);
   const sum = field => bills.reduce((value, {total}) => value + total[field], 0n);
   byId("total").textContent = formatAmount(items.reduce((value, item) => value + BigInt(item.units), 0n));
   byId("open-total").textContent = formatAmount(sum("remaining"));
   byId("paid-total").textContent = formatAmount(sum("received"));
   byId("overpaid-total").textContent = formatAmount(sum("overpaid"));
-  byId("count").textContent = t("{0} 张账单 · {1} 张待对账", items.length, open.length);
-
-  const filtered = filter === "all" ? bills : filter === "open" ? open : paid;
+  const statusMatches = filter === "open" ? open : bills.filter(({total}) =>
+    filter === "all" || (filter === "paid" ? !total.remaining : total.state === filter));
+  const query = billSearch.value.trim();
+  const folded = query.toLowerCase();
+  const solana = query && Ledger.networkForWorkspace(mode).family === "solana";
+  const filtered = query ? statusMatches.filter(({item}) =>
+    item.id.toLowerCase().includes(folded) || item.customer.toLowerCase().includes(folded) ||
+    (solana ? item.address.includes(query) : item.address.toLowerCase().includes(folded))) : statusMatches;
+  byId("count").textContent = query || filter !== "all" ? t("显示 {0} / {1} 张账单", filtered.length, items.length)
+    : t("{0} 张账单 · {1} 张待对账", items.length, open.length);
   rows.replaceChildren();
   if (!filtered.length) {
-    const cell = element("td", filter === "all" ? t("暂无账单。可以新建账单或导入 CSV。") : t("该状态暂无账单。"), "empty");
+    const message = query ? t("没有找到符合搜索条件的账单。")
+      : filter === "all" ? t("暂无账单。可以新建账单或导入 CSV。") : t("该状态暂无账单。");
+    const cell = element("td", message, "empty");
     cell.colSpan = 4;
     rows.appendChild(element("tr")).append(cell);
     return;
@@ -120,6 +130,11 @@ function renderBills() {
     if (total.overpaid) status.append(element("small", t("多 {0}", formatAmount(total.overpaid))));
     const action = element("td");
     const actions = element("div", undefined, "row-actions");
+    const edit = element("button", t("编辑"), "text-btn");
+    edit.type = "button";
+    edit.setAttribute("aria-label", t("编辑账单 {0}", item.id));
+    edit.addEventListener("click", () => openBillForm(item));
+    actions.append(edit);
     if (total.received > 0n) {
       const undo = element("button", t("付款记录"), "text-btn");
       undo.type = "button";
@@ -236,7 +251,7 @@ function renderTransfers(visible) {
         if (!item) return;
         submit.disabled = true;
         try {
-          await Ledger.matchBill(await database, selectedMode, id, transfer, Ledger.billTotals(item).received.toString());
+          await Ledger.matchBill(await database, selectedMode, id, transfer, Ledger.billTotals(item).received.toString(), item.units);
           if (mode !== selectedMode) return;
           await refresh();
           announce(t("已将这笔转账关联到 {0}。", id));
@@ -387,6 +402,7 @@ function selectMode(selectedMode) {
   failures = [];
   receiptBill = "";
   inboxLimit = inboxPageSize;
+  billSearch.value = "";
   filters[0].click();
   selectView("batch");
   hashInput.value = "";
@@ -614,6 +630,27 @@ function openForm(dialog) {
   return true;
 }
 
+function openBillForm(item) {
+  if (!openForm(billDialog)) return;
+  editingBill = item;
+  const fields = billDialog.querySelector("form").elements;
+  const locked = !!item && Ledger.paymentsFor(item).length > 0;
+  fields.id.readOnly = !!item;
+  fields.amount.readOnly = locked;
+  fields.address.readOnly = locked;
+  byId("bill-form-title").textContent = item ? t("编辑账单") : t("新建账单");
+  if (item) {
+    fields.id.value = item.id;
+    fields.customer.value = item.customer;
+    fields.amount.value = Ledger.decimal(item.units, Ledger.assetForWorkspace(item.mode).decimals);
+  }
+  fields.address.value = item?.address ?? (mode === "demo" ? Ledger.demoAddress : "");
+  const hint = locked ? t("账单已有付款关联，金额和收款地址已锁定。")
+    : t("修改金额或收款地址后，请重新生成付款页并发给客户。");
+  feedback(byId("bill-edit-help"), item ? hint : "");
+  (item ? fields.customer : fields.id).focus();
+}
+
 function openPaymentPage(item) {
   paymentRequest = Payment.fromBill(item, Ledger);
   byId("payment-summary").textContent = t("{0} · 待收 {1}", item.id, moneyLabel(Ledger.billTotals(item).remaining, item.mode));
@@ -724,14 +761,12 @@ byId("exception-form").addEventListener("submit", async event => {
   }
 });
 
-byId("new").addEventListener("click", () => {
-  openForm(billDialog);
-  if (mode === "demo") billDialog.querySelector('[name="address"]').value = Ledger.demoAddress;
-});
+byId("new").addEventListener("click", () => openBillForm());
+billSearch.addEventListener("input", renderBills);
 
 byId("import").addEventListener("click", () => openForm(importDialog));
 
-function connectSaveDialog(dialog, makeBills) {
+function connectSaveDialog(dialog, save) {
   const form = dialog.querySelector("form");
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -739,29 +774,42 @@ function connectSaveDialog(dialog, makeBills) {
     const submit = form.querySelector('[type="submit"]');
     submit.disabled = true;
     try {
-      const bills = await makeBills(new FormData(form), currentMode);
-      await Ledger.saveBills(await database, bills);
+      const {message, resetFilter} = await save(new FormData(form), currentMode);
       if (currentMode !== mode) return;
       dialog.close();
-      filters[0].click();
+      if (resetFilter) {
+        billSearch.value = "";
+        filters[0].click();
+      }
       await refresh();
-      announce(t("已保存 {0} 张账单。", bills.length));
+      announce(message);
     } catch (error) {
       feedback(form.querySelector(".feedback"), error.message, true);
+      if (dialog === billDialog && editingBill && currentMode === mode) await refresh();
     } finally {
       submit.disabled = false;
     }
   });
 }
 
-connectSaveDialog(billDialog, (data, selectedMode) => [
-  Ledger.bill(selectedMode, ["id", "customer", "amount", "address"].map(key => data.get(key)))
-]);
+async function saveNewBills(bills) {
+  await Ledger.saveBills(await database, bills);
+  return {message: t("已保存 {0} 张账单。", bills.length), resetFilter: true};
+}
+
+connectSaveDialog(billDialog, async (data, selectedMode) => {
+  const original = editingBill;
+  const fields = ["customer", "amount", "address"].map(key => data.get(key));
+  if (!original) return saveNewBills([Ledger.bill(selectedMode, [data.get("id"), ...fields])]);
+  if (original.mode !== selectedMode) throw new Error(t("账单所在的工作区已切换，请重新打开账单。"));
+  const changed = await Ledger.updateBill(await database, original, fields);
+  return {message: changed ? t("已更新账单 {0}。", original.id) : t("账单没有变更。")};
+});
 
 connectSaveDialog(importDialog, async (data, selectedMode) => {
   const file = data.get("file");
   if (!file || !file.size || file.size > 1024 * 1024) throw new Error(t("请选择 1 MB 以内的非空 CSV 文件。"));
-  return Ledger.importCsv(await file.text(), selectedMode);
+  return saveNewBills(Ledger.importCsv(await file.text(), selectedMode));
 });
 
 function downloadBlob(filename, blob) {
@@ -919,7 +967,13 @@ function openVerificationPage() {
   renderPage();
 }
 
-window.addEventListener("hashchange", renderPage);
+window.addEventListener("hashchange", () => {
+  renderPage();
+  void refresh();
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void refresh();
+});
 renderPage();
 
 function initialWorkspace() {

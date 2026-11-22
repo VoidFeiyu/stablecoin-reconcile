@@ -47,8 +47,18 @@
     </section>
     <div class="workspace">
       <section class="panel invoices" id="invoice-panel">
-        <div class="panel-heading"><div><h2>账单列表</h2><p id="count"></p></div><button type="button" id="export" class="button compact">导出 CSV</button></div>
-        <div class="tabs" role="group" aria-label="按状态筛选"><button data-filter="all" aria-pressed="true">全部</button><button data-filter="open" aria-pressed="false">待收</button><button data-filter="paid" aria-pressed="false">已结清</button></div>
+        <div class="panel-heading"><div><h2>账单列表</h2><p id="count" role="status"></p></div><button type="button" id="export" class="button compact">导出全部 CSV</button></div>
+        <div class="invoice-search">
+          <label for="bill-search" class="sr-only">搜索账单</label>
+          <input id="bill-search" type="search" placeholder="按账单号、客户或收款地址搜索" spellcheck="false" autocomplete="off">
+        </div>
+        <div class="tabs" role="group" aria-label="按状态筛选">
+          <button type="button" data-filter="all" aria-pressed="true">全部</button>
+          <button type="button" data-filter="open" aria-pressed="false">待收</button>
+          <button type="button" data-filter="partial" aria-pressed="false">部分收款</button>
+          <button type="button" data-filter="paid" aria-pressed="false">已结清</button>
+          <button type="button" data-filter="overpaid" aria-pressed="false">多收</button>
+        </div>
         <div class="table-scroll"><table><thead><tr><th>账单 / 客户</th><th>金额 (<span class="asset-symbol">USDC</span>)</th><th>状态</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="rows"></tbody></table></div>
       </section>
       <section class="panel verify" id="verification-panel" aria-label="交易核验操作" hidden>
@@ -93,14 +103,15 @@
     </div>
     <p id="message" class="message" role="status" hidden></p>
   </main>
-  <dialog id="bill-dialog">
+  <dialog id="bill-dialog" aria-labelledby="bill-form-title">
     <form id="bill-form">
-      <div class="dialog-title"><h2>新建账单</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+      <div class="dialog-title"><h2 id="bill-form-title">新建账单</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
       <label>账单号<input name="id" maxlength="40" placeholder="例如 INV-1045" required></label>
       <label>客户<input name="customer" maxlength="80" required></label>
       <label>金额 (<span class="asset-symbol">USDC</span>)<input name="amount" inputmode="decimal" maxlength="335" placeholder="例如 500.00" required></label>
       <label>收款地址<input name="address" maxlength="44" placeholder="0x…" autocomplete="off" spellcheck="false" required></label>
       <p class="feedback" role="status"></p>
+      <p id="bill-edit-help" class="feedback" hidden></p>
       <button class="button primary" type="submit">保存账单</button>
     </form>
   </dialog>
