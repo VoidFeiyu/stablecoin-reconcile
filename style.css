@@ -39,6 +39,7 @@ main { max-width: 1710px; margin-left: 218px; padding: 23px clamp(18px, 3.2vw, 5
 .network-control { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
 .network-control select { width: auto; min-width: 112px; padding: 7px 9px; }
 #asset-select { min-width: 86px; max-width: 155px; }
+#language-select { min-width: 96px; }
 .crumb { color: var(--subtle); font-size: .875rem; }
 .crumb-divider { color: #78908b; margin: 0 5px; }
 .switch { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: #e7efed; white-space: nowrap; }

@@ -1,6 +1,8 @@
 "use strict";
 
 const Payment = (() => {
+  const localization = typeof module !== "undefined" ? require("./i18n") : I18n;
+  const t = localization.t;
   const address = /^0x[0-9a-f]{40}$/i;
   const hash = /^0x[0-9a-f]{64}$/i;
   const receiptPrefix = "LEDGER-RECEIPT-1.";
@@ -24,13 +26,13 @@ const Payment = (() => {
     return btoa(String.fromCharCode(...bytes)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
   }
 
-  function decode(value) {
-    if (!/^[a-z0-9_-]{1,3072}$/i.test(value)) throw new Error("账单或凭证格式有误。");
+  function decode(value, translate = t) {
+    if (!/^[a-z0-9_-]{1,3072}$/i.test(value)) throw new Error(translate("账单或凭证格式有误。"));
     try {
       const base64 = value.replaceAll("-", "+").replaceAll("_", "/");
       return JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(Uint8Array.from(atob(base64), char => char.charCodeAt(0))));
     } catch {
-      throw new Error("账单或凭证格式有误。");
+      throw new Error(translate("账单或凭证格式有误。"));
     }
   }
 
@@ -62,7 +64,7 @@ const Payment = (() => {
       typeof value.amount !== "string" || !/^\d{1,78}(?:\.\d{1,255})?$/.test(value.amount) || !/[1-9]/.test(value.amount) ||
       !acceptedAddress ||
       typeof value.created !== "string" || !Number.isFinite(Date.parse(value.created))) {
-      throw new Error("付款账单信息不完整或格式有误。");
+      throw new Error(t("付款账单信息不完整或格式有误。"));
     }
     return value;
   }
@@ -93,7 +95,7 @@ const Payment = (() => {
     }
   }
 
-  function payer(root, request, encodeData, copy, validSolana) {
+  function payer(root, request, encodeData, copy, validSolana, t, apply, language) {
     root.innerHTML = `<h1>付款账单</h1><p id="pay-ref" class="meta"></p>
       <p id="demo-message" class="demo" hidden>这是演示账单，请勿转账。</p>
       <strong id="pay-amount" class="amount"></strong>
@@ -116,22 +118,23 @@ const Payment = (() => {
         </div>
       </form>
       <p class="feedback" id="pay-status" role="status"></p>`;
+    apply(root, t);
     const find = selector => root.querySelector(selector);
     const feedback = find("#pay-status");
-    find("#pay-ref").textContent = "账单 " + request.id + " · " + new Date(request.created).toLocaleString("zh-CN");
+    find("#pay-ref").textContent = t("账单 {0} · {1}", request.id, new Date(request.created).toLocaleString(language));
     find("#demo-message").hidden = !request.demo;
     find("#pay-amount").textContent = request.amount + " " + request.symbol;
     const solana = request.family === "solana";
-    find("#pay-network").textContent = solana ? request.network + " 主网" : request.network + "（链 ID " + request.chainId + "）";
-    find("#pay-token-label").textContent = request.contract === "native" ? "资产类型" : "代币合约";
-    find("#pay-token").value = request.contract === "native" ? "原生 " + request.symbol : request.contract;
+    find("#pay-network").textContent = solana ? t("{0} 主网", request.network) : t("{0}（链 ID {1}）", request.network, request.chainId);
+    find("#pay-token-label").textContent = request.contract === "native" ? t("资产类型") : t("代币合约");
+    find("#pay-token").value = request.contract === "native" ? t("原生 {0}", request.symbol) : request.contract;
     find("#pay-wallet").value = request.address;
     if (solana) {
-      find("#paid-hash-label").textContent = "付款交易签名";
-      find("#paid-hash").placeholder = "Solana 交易签名";
+      find("#paid-hash-label").textContent = t("付款交易签名");
+      find("#paid-hash").placeholder = t("Solana 交易签名");
     }
     find("#copy-wallet").addEventListener("click", async () => {
-      feedback.textContent = await copy(request.address) ? "已复制收款地址。" : "请在收款地址栏手动复制。";
+      feedback.textContent = await copy(request.address) ? t("已复制收款地址。") : t("请在收款地址栏手动复制。");
     });
     find("#paid-hash").addEventListener("input", () => {
       find("#proof-output").hidden = true;
@@ -142,7 +145,7 @@ const Payment = (() => {
       const provided = find("#paid-hash").value.trim();
       const value = solana ? provided : provided.toLowerCase();
       if (solana ? !validSolana(value, 64) : !/^0x[0-9a-f]{64}$/.test(value)) {
-        feedback.textContent = solana ? "请输入完整的 Solana 交易签名。" : "请输入完整的付款交易哈希。";
+        feedback.textContent = solana ? t("请输入完整的 Solana 交易签名。") : t("请输入完整的付款交易哈希。");
         return;
       }
       find("#proof-text").value = "LEDGER-RECEIPT-1." + encodeData({
@@ -150,10 +153,10 @@ const Payment = (() => {
         ...(solana ? {family: "solana"} : {})
       });
       find("#proof-output").hidden = false;
-      feedback.textContent = "凭证已生成。";
+      feedback.textContent = t("凭证已生成。");
     });
     find("#copy-proof").addEventListener("click", async () => {
-      feedback.textContent = await copy(find("#proof-text").value) ? "已复制付款凭证。" : "请在凭证栏手动复制。";
+      feedback.textContent = await copy(find("#proof-text").value) ? t("已复制付款凭证。") : t("请在凭证栏手动复制。");
     });
   }
 
@@ -163,7 +166,8 @@ const Payment = (() => {
     return readable({id: item.id, chainId: network.id, network: network.name, demo: item.mode === "demo",
       ...(network.family ? {family: network.family} : {}),
       symbol: asset.symbol, contract: asset.contract, address: item.address,
-      amount: ledger.decimal(ledger.billTotals(item).remaining, asset.decimals), created: new Date().toISOString()});
+      amount: ledger.decimal(ledger.billTotals(item).remaining, asset.decimals), created: new Date().toISOString(),
+      language: localization.language});
   }
 
   function readReceipt(value) {
@@ -173,7 +177,7 @@ const Payment = (() => {
     const solana = receipt?.family === "solana";
     const validHash = solana ? validSolanaValue(receipt.hash, 64) : typeof receipt?.hash === "string" && hash.test(receipt.hash);
     if (!scope(receipt) || !validHash) {
-      throw new Error("付款凭证缺少账单信息或交易标识。");
+      throw new Error(t("付款凭证缺少账单信息或交易标识。"));
     }
     return {...receipt, hash: solana ? receipt.hash : receipt.hash.toLowerCase(), contract: receipt.contract.toLowerCase()};
   }
@@ -187,19 +191,34 @@ const Payment = (() => {
 
   function standalone(request) {
     const payload = encode(request);
-    return '<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
-      '<title>付款账单</title><style>' + style + '</style><main id="payer"></main><script>' +
-      'const request = (' + decode.toString() + ')("' + payload + '");' +
+    const language = localization.choose(request.language ?? localization.language);
+    const translate = localization.translator(language, localization.messages);
+    const catalog = JSON.stringify(localization.messages).replaceAll("<", "\\u003c");
+    return '<!doctype html><html lang="' + language + '"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<title>' + translate("付款账单") + '</title><style>' + style + '</style><main id="payer"></main><script>' +
+      'const language = "' + language + '";' +
+      'const t = (' + localization.translator.toString() + ')(language, ' + catalog + ');' +
+      'const request = (' + decode.toString() + ')("' + payload + '", t);' +
       '(' + payer.toString() + ')(document.getElementById("payer"), request, ' + encode.toString() + ', ' +
-      copyText.toString() + ', ' + validSolanaValue.toString() + ');<\/script></html>';
+      copyText.toString() + ', ' + validSolanaValue.toString() + ', t, ' + localization.apply.toString() + ', language);<\/script></html>';
   }
 
   function openHosted(root, fragment) {
     const styles = document.createElement("style");
     styles.textContent = style;
     document.head.append(styles);
-    try { payer(root, readable(decode(fragment.slice(1))), encode, copyText, validSolanaValue); }
-    catch (error) { root.textContent = error.message; }
+    document.documentElement.lang = localization.language;
+    document.title = t("付款账单");
+    try {
+      const request = readable(decode(fragment.slice(1)));
+      const language = localization.choose(request.language ?? localization.language);
+      const translate = localization.translator(language, localization.messages);
+      document.documentElement.lang = language;
+      document.title = translate("付款账单");
+      payer(root, request, encode, copyText, validSolanaValue, translate, localization.apply, language);
+    } catch (error) {
+      root.textContent = error.message;
+    }
   }
 
   return {copyText, fromBill, hostedLink, openHosted, readReceipt, standalone};

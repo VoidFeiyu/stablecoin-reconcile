@@ -1,6 +1,7 @@
 "use strict";
 
 const Backup = (ledger => {
+  const t = (typeof module !== "undefined" ? require("./i18n") : I18n).t;
   const format = "usdc-ledger";
   const storeNames = ["invoices", "receipts", "activity"];
   const entryKey = (transfer, mode) => ledger.paymentKey(mode, transfer);
@@ -8,7 +9,7 @@ const Backup = (ledger => {
 
   function date(value) {
     if (typeof value !== "string" || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
-      throw new Error("备份里包含无效时间。");
+      throw new Error(t("备份里包含无效时间。"));
     }
     return value;
   }
@@ -21,7 +22,7 @@ const Backup = (ledger => {
       (record.network ?? "base") !== network.key || (record.asset ?? network.usdc) !== asset.contract ||
       typeof record.address !== "string" ||
       typeof record.units !== "string" || !/^[1-9]\d{0,77}$/.test(record.units) || BigInt(record.units) >= 2n ** 256n) {
-      throw new Error("备份里包含无效的主网转账。");
+      throw new Error(t("备份里包含无效的主网转账。"));
     }
     return {hash: ledger.normalizedTransactionId(mode, record.hash), index: record.index, address: ledger.normalizeAddress(record.address, mode),
       units: record.units, time: date(record.time), demo: false, network: network.key, asset: asset.contract};
@@ -30,28 +31,28 @@ const Backup = (ledger => {
   function invoice(record, mode) {
     if (record?.mode !== mode || typeof record.id !== "string" || typeof record.customer !== "string" ||
       typeof record.address !== "string" || typeof record.units !== "string" || !/^[1-9]\d{0,77}$/.test(record.units)) {
-      throw new Error("备份里包含无效的主网账单。");
+      throw new Error(t("备份里包含无效的主网账单。"));
     }
     const amount = ledger.decimal(record.units, ledger.assetForWorkspace(mode).decimals);
     const bill = ledger.bill(mode, [record.id, record.customer, amount, record.address]);
     bill.created = date(record.created);
     if (record.payments !== undefined && (!Array.isArray(record.payments) || record.payment !== undefined)) {
-      throw new Error("备份里有无效的账单付款列表。");
+      throw new Error(t("备份里有无效的账单付款列表。"));
     }
     const payments = (record.payments ?? (record.payment === undefined ? [] : [record.payment]))
       .map(payment => transfer(payment, mode));
     if (!payments.every(payment => ledger.canMatch(bill, payment))) {
-      throw new Error("备份里有账单与已关联转账不一致。");
+      throw new Error(t("备份里有账单与已关联转账不一致。"));
     }
     return {...bill, payments};
   }
 
   function receipt(record, mode) {
-    if (record?.mode !== mode) throw new Error("备份里包含无效的主网转账。");
+    if (record?.mode !== mode) throw new Error(t("备份里包含无效的主网转账。"));
     const item = {...transfer(record, mode), mode};
     if (record.exception === undefined) return item;
     if (typeof record.exception !== "string" || !record.exception.trim() || record.exception.length > 160) {
-      throw new Error("备份里包含无效的异常说明。");
+      throw new Error(t("备份里包含无效的异常说明。"));
     }
     return {...item, exception: record.exception};
   }
@@ -60,7 +61,7 @@ const Backup = (ledger => {
     if (record?.mode !== mode || typeof record.id !== "string" ||
       !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(record.id) ||
       typeof record.description !== "string" || !record.description.trim() || record.description.length > 2000) {
-      throw new Error("备份里包含无效的操作记录。");
+      throw new Error(t("备份里包含无效的操作记录。"));
     }
     return {id: record.id.toLowerCase(), mode, at: date(record.at), description: record.description};
   }
@@ -75,7 +76,7 @@ const Backup = (ledger => {
         const key = entryKey(payment, mode);
         const known = receipts.get(key);
         if (seen.has(key) || (known && (known.exception || !same(transfer(known, mode), payment)))) {
-          throw new Error("备份里有冲突的付款关联。");
+          throw new Error(t("备份里有冲突的付款关联。"));
         }
         seen.add(key);
       }
@@ -85,30 +86,30 @@ const Backup = (ledger => {
   function decode(text, mode) {
     let data;
     try { data = JSON.parse(text.replace(/^\uFEFF/, "")); }
-    catch { throw new Error("文件不是有效的 JSON 备份。"); }
+    catch { throw new Error(t("文件不是有效的 JSON 备份。")); }
     const versionOne = data?.format === "base-usdc-ledger" && data.version === 1;
     const versionTwo = data?.format === format && data.version === 2;
     const versionThree = data?.format === format && data.version === 3;
     const versionFour = data?.format === format && data.version === 4;
     if ((!versionOne && !versionTwo && !versionThree && !versionFour) || !storeNames.every(name => Array.isArray(data[name]))) {
-      throw new Error("请选择此对账台生成的主网备份文件。");
+      throw new Error(t("请选择此对账台生成的主网备份文件。"));
     }
     const source = versionOne ? "base" : data.network;
     const current = ledger.networkForWorkspace(mode);
     if (source !== current.key) {
-      throw new Error("这份备份与当前的 " + current.name + " 工作区不匹配。请先切换到备份所属网络。");
+      throw new Error(t("这份备份与当前的 {0} 工作区不匹配。请先切换到备份所属网络。", current.name));
     }
     const asset = ledger.assetForWorkspace(mode);
     const hasAssetMetadata = versionThree || versionFour;
     if (asset.contract !== (hasAssetMetadata ? data.asset : current.usdc) || asset.decimals !== (hasAssetMetadata ? data.decimals : 6)) {
-      throw new Error("备份币种的合约或精度与当前工作区不一致。");
+      throw new Error(t("备份币种的合约或精度与当前工作区不一致。"));
     }
     const sets = storeNames.map((name, index) => {
       const items = new Map();
       for (const raw of data[name]) {
         const item = normalizers[index](raw, mode);
         const key = keys[index](item, mode);
-        if (items.has(key)) throw new Error("备份里有重复记录。");
+        if (items.has(key)) throw new Error(t("备份里有重复记录。"));
         items.set(key, item);
       }
       return items;
@@ -134,7 +135,7 @@ const Backup = (ledger => {
       transaction.oncomplete = () => resolve({format, version: 4, network, asset: asset.contract, decimals: asset.decimals,
         exportedAt: new Date().toISOString(),
         ...Object.fromEntries(storeNames.map((name, index) => [name, requests[index].result]))});
-      transaction.onabort = () => reject(new Error("无法导出主网备份。"));
+      transaction.onabort = () => reject(new Error(t("无法导出主网备份。")));
     });
   }
 
@@ -155,7 +156,7 @@ const Backup = (ledger => {
             const missingItems = [];
             for (const [key, item] of items) {
               const existing = records[index].get(key);
-              if (existing && !same(existing, item)) throw new Error("备份与当前账目有冲突，本次恢复未写入。");
+              if (existing && !same(existing, item)) throw new Error(t("备份与当前账目有冲突，本次恢复未写入。"));
               if (!existing) {
                 records[index].set(key, item);
                 missingItems.push(item);
@@ -177,7 +178,7 @@ const Backup = (ledger => {
         }
       };
       transaction.oncomplete = () => resolve(added);
-      transaction.onabort = () => reject(new Error(reason || "恢复备份失败，本次未写入。"));
+      transaction.onabort = () => reject(new Error(reason || t("恢复备份失败，本次未写入。")));
     });
   }
 

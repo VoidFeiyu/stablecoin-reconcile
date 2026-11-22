@@ -1,6 +1,8 @@
 "use strict";
 
 const Ledger = (() => {
+  const localization = typeof module !== "undefined" ? require("./i18n") : I18n;
+  const t = localization.t;
   const addressPattern = /^0x[0-9a-f]{40}$/i;
   const hashPattern = /^0x[0-9a-f]{64}$/i;
   const networks = Object.freeze({
@@ -79,7 +81,7 @@ const Ledger = (() => {
 
   function getNetwork(key) {
     const catalog = networkCatalog();
-    if (!Object.hasOwn(catalog, key)) throw new Error("请选择受支持的网络。");
+    if (!Object.hasOwn(catalog, key)) throw new Error(t("请选择受支持的网络。"));
     return catalog[key];
   }
 
@@ -97,7 +99,7 @@ const Ledger = (() => {
   function networkForWorkspace(workspace) {
     if (workspace === "demo" || workspace === "live") return networks.base;
     const parsed = /^live:([^:]+)(?::(native|0x[0-9a-f]{40}))?$/.exec(workspace);
-    if (!parsed) throw new Error("未知的主网工作区。");
+    if (!parsed) throw new Error(t("未知的主网工作区。"));
     return getNetwork(parsed[1]);
   }
 
@@ -105,7 +107,7 @@ const Ledger = (() => {
     const network = getNetwork(key);
     const assets = assetsForNetwork(key);
     const asset = contract ? assets.find(candidate => candidate.contract === contract) : assets[0];
-    if (!asset) throw new Error("请先添加此网络的币种。");
+    if (!asset) throw new Error(t("请先添加此网络的币种。"));
     if (asset.contract === network.usdc) return key === "base" ? "live" : "live:" + key;
     return "live:" + key + ":" + asset.contract;
   }
@@ -114,32 +116,32 @@ const Ledger = (() => {
     const network = networkForWorkspace(workspace);
     const contract = workspace.split(":")[2] ?? network.usdc;
     const asset = assetsForNetwork(network.key).find(candidate => candidate.contract === contract);
-    if (!asset) throw new Error("此工作区的代币尚未配置。");
+    if (!asset) throw new Error(t("此工作区的代币尚未配置。"));
     return asset;
   }
 
   function nodeUrl(value, explorer = false) {
     let url;
     try { url = new URL(value.trim()); }
-    catch { throw new Error("请输入有效的 HTTPS 地址。"); }
+    catch { throw new Error(t("请输入有效的 HTTPS 地址。")); }
     const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
     if (url.username || url.password || url.hash || (explorer && url.search) ||
       (url.protocol !== "https:" && (explorer || url.protocol !== "http:" || !loopback))) {
-      throw new Error("请输入 HTTPS 地址、本机 RPC 地址或不含认证信息的浏览器地址。");
+      throw new Error(t("请输入 HTTPS 地址、本机 RPC 地址或不含认证信息的浏览器地址。"));
     }
     return explorer ? url.href.replace(/\/$/, "") : url.href;
   }
 
   function customNetwork(name, id, rpc, explorer) {
     const title = name.trim();
-    if (!title || title.length > 40 || !Number.isSafeInteger(id) || id < 1) throw new Error("请输入网络名称和有效的链 ID。");
+    if (!title || title.length > 40 || !Number.isSafeInteger(id) || id < 1) throw new Error(t("请输入网络名称和有效的链 ID。"));
     return {key: "evm-" + id, name: title, id, scanRpc: nodeUrl(rpc), explorer: explorer.trim() ? nodeUrl(explorer, true) : ""};
   }
 
   function customAsset(network, symbol, contract, decimals) {
     const ticker = symbol.trim();
-    if (!/^[a-z0-9._+\-]{1,14}$/i.test(ticker)) throw new Error("币种简称须为 1 至 14 个字母、数字或 . _ + -。");
-    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new Error("合约返回了无效的代币精度。");
+    if (!/^[a-z0-9._+\-]{1,14}$/i.test(ticker)) throw new Error(t("币种简称须为 1 至 14 个字母、数字或 . _ + -。"));
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new Error(t("合约返回了无效的代币精度。"));
     return {network, symbol: ticker, contract: normalizeAddress(contract), decimals};
   }
 
@@ -148,19 +150,19 @@ const Ledger = (() => {
     const chainIds = new Set(Object.values(networks).map(network => network.id));
     const keys = new Set(Object.keys(networks));
     for (const network of networksIn) {
-      if (chainIds.has(network.id)) throw new Error("链 ID 已存在。要添加 RPC 请使用节点表单。");
+      if (chainIds.has(network.id)) throw new Error(t("链 ID 已存在。要添加 RPC 请使用节点表单。"));
       chainIds.add(network.id);
       keys.add(network.key);
     }
     const checkNetwork = key => {
-      if (!keys.has(key)) throw new Error("请先添加所属网络。");
+      if (!keys.has(key)) throw new Error(t("请先添加所属网络。"));
       return key;
     };
     const nodes = data.nodes.map(node => ({network: checkNetwork(node.network), url: nodeUrl(node.url)}));
     const assets = data.assets.map(asset => customAsset(checkNetwork(asset.network), asset.symbol, asset.contract, asset.decimals));
     if (new Set(nodes.map(node => node.network + ":" + node.url)).size !== nodes.length ||
       new Set(assets.map(asset => asset.network + ":" + asset.contract)).size !== assets.length) {
-      throw new Error("已有相同的节点或代币合约。");
+      throw new Error(t("已有相同的节点或代币合约。"));
     }
     configuration = {networks: networksIn, nodes, assets};
   }
@@ -195,17 +197,17 @@ const Ledger = (() => {
   function parseHashes(value, workspace = "live") {
     const entries = value.split(/[\s,，;；]+/u).filter(Boolean).map(hash => normalizedTransactionId(workspace, hash));
     const hashes = [...new Set(entries)];
-    if (!hashes.length) throw new Error("请输入至少一个交易哈希。");
-    if (hashes.length > 10) throw new Error("每次最多核验 10 个不同的交易哈希。");
+    if (!hashes.length) throw new Error(t("请输入至少一个交易哈希。"));
+    if (hashes.length > 10) throw new Error(t("每次最多核验 10 个不同的交易哈希。"));
     return {hashes, duplicates: entries.length - hashes.length};
   }
 
   function parseAmount(value, decimals) {
-    if (!/^\d{1,78}(?:\.\d{1,255})?$/.test(value)) throw new Error("请输入正数金额。");
+    if (!/^\d{1,78}(?:\.\d{1,255})?$/.test(value)) throw new Error(t("请输入正数金额。"));
     const [whole, cents = ""] = value.split(".");
-    if (cents.length > decimals) throw new Error("该币种最多支持 " + decimals + " 位小数。");
+    if (cents.length > decimals) throw new Error(t("该币种最多支持 {0} 位小数。", decimals));
     const units = BigInt(whole + cents.padEnd(decimals, "0"));
-    if (units === 0n || units >= 2n ** 256n) throw new Error("金额须大于零，且在合约支持的范围内。");
+    if (units === 0n || units >= 2n ** 256n) throw new Error(t("金额须大于零，且在合约支持的范围内。"));
     return units.toString();
   }
 
@@ -224,7 +226,7 @@ const Ledger = (() => {
   function bill(mode, [rawId, rawCustomer, rawAmount, rawAddress]) {
     const [id, customer, amount] = [rawId, rawCustomer, rawAmount].map(value => value.trim());
     if (!id || id.length > 40 || !customer || customer.length > 80) {
-      throw new Error("请输入账单号和客户，长度上限分别为 40 和 80 个字符。");
+      throw new Error(t("请输入账单号和客户，长度上限分别为 40 和 80 个字符。"));
     }
     return {mode, id, customer, address: normalizeAddress(rawAddress, mode),
       units: parseAmount(amount, assetForWorkspace(mode).decimals), created: new Date().toISOString()};
@@ -233,10 +235,10 @@ const Ledger = (() => {
   function normalizeAddress(value, workspace = "live") {
     const address = value.trim();
     if (networkForWorkspace(workspace).family === "solana") {
-      if (!validBase58(address, 32) || address === "11111111111111111111111111111111") throw new Error("请输入有效的 Solana 收款地址。");
+      if (!validBase58(address, 32) || address === "11111111111111111111111111111111") throw new Error(t("请输入有效的 Solana 收款地址。"));
       return address;
     }
-    if (!addressPattern.test(address) || /^0x0{40}$/i.test(address)) throw new Error("请输入有效的收款地址。");
+    if (!addressPattern.test(address) || /^0x0{40}$/i.test(address)) throw new Error(t("请输入有效的收款地址。"));
     return address.toLowerCase();
   }
 
@@ -349,8 +351,8 @@ const Ledger = (() => {
         request.result.onversionchange = () => request.result.close();
         resolve(request.result);
       };
-      request.onerror = () => reject(new Error("无法打开本地账单库。请检查浏览器的存储设置。"));
-      request.onblocked = () => reject(new Error("账单库正被另一个窗口占用。关闭其他对账台窗口后重试。"));
+      request.onerror = () => reject(new Error(t("无法打开本地账单库。请检查浏览器的存储设置。")));
+      request.onblocked = () => reject(new Error(t("账单库正被另一个窗口占用。关闭其他对账台窗口后重试。")));
     });
   }
 
@@ -372,7 +374,7 @@ const Ledger = (() => {
           cursor.continue();
         }
       };
-      request.onerror = () => reject(new Error("无法读取操作记录。"));
+      request.onerror = () => reject(new Error(t("无法读取操作记录。")));
     });
   }
 
@@ -384,7 +386,7 @@ const Ledger = (() => {
     return new Promise((resolve, reject) => {
       const request = db.transaction("invoices").objectStore("invoices").index("mode").getAll(mode);
       request.onsuccess = () => resolve(sortBills(request.result));
-      request.onerror = () => reject(new Error("无法读取账单。"));
+      request.onerror = () => reject(new Error(t("无法读取账单。")));
     });
   }
 
@@ -401,13 +403,13 @@ const Ledger = (() => {
         resolve({bills, pending: unlinked.filter(transfer => !transfer.exception),
           exceptions: unlinked.filter(transfer => transfer.exception)});
       };
-      transaction.onabort = () => reject(new Error("无法读取账单和待匹配入账。"));
+      transaction.onabort = () => reject(new Error(t("无法读取账单和待匹配入账。")));
     });
   }
 
   function saveReceipts(db, mode, transfers) {
     if (transfers.some(transfer => !inWorkspace(mode, transfer))) {
-      return Promise.reject(new Error("转账所属网络与当前工作区不一致。"));
+      return Promise.reject(new Error(t("转账所属网络与当前工作区不一致。")));
     }
     return new Promise((resolve, reject) => {
       const transaction = db.transaction("receipts", "readwrite");
@@ -420,7 +422,7 @@ const Ledger = (() => {
         };
       }
       transaction.oncomplete = resolve;
-      transaction.onabort = () => reject(new Error("未能保存这批转账，请重新核验。"));
+      transaction.onabort = () => reject(new Error(t("未能保存这批转账，请重新核验。")));
     });
   }
 
@@ -434,8 +436,8 @@ const Ledger = (() => {
         ? "新增账单 " + bills[0].id : "导入 " + bills.length + " 张账单");
       transaction.oncomplete = resolve;
       transaction.onabort = () => reject(new Error(transaction.error?.name === "ConstraintError"
-        ? "账单号已存在。本次保存未写入任何账单。"
-        : "保存失败。本次保存未写入任何账单。"));
+        ? t("账单号已存在。本次保存未写入任何账单。")
+        : t("保存失败。本次保存未写入任何账单。")));
     });
   }
 
@@ -450,7 +452,7 @@ const Ledger = (() => {
         const item = request.result;
         if (!item || !canMatch(item, transfer) || receipt.result?.exception ||
           (expectedReceived !== undefined && billTotals(item).received.toString() !== expectedReceived)) {
-          reason = "账单状态已改变，或地址和金额不一致。请重新核验。";
+          reason = t("账单状态已改变，或地址和金额不一致。请重新核验。");
           transaction.abort();
           return;
         }
@@ -461,7 +463,7 @@ const Ledger = (() => {
       };
       transaction.oncomplete = resolve;
       transaction.onabort = () => reject(new Error(reason || (transaction.error?.name === "ConstraintError"
-        ? "这笔转账已经关联到其他账单。" : "关联失败，请重试。")));
+        ? t("这笔转账已经关联到其他账单。") : t("关联失败，请重试。"))));
     });
   }
 
@@ -488,8 +490,8 @@ const Ledger = (() => {
       };
       transaction.oncomplete = resolve;
       transaction.onabort = () => reject(new Error(changed
-        ? "账单或转账状态已改变，本次未写入。请核对更新后的匹配建议。"
-        : "批量关联未写入，请重试。"));
+        ? t("账单或转账状态已改变，本次未写入。请核对更新后的匹配建议。")
+        : t("批量关联未写入，请重试。")));
     });
   }
 
@@ -514,8 +516,8 @@ const Ledger = (() => {
       };
       transaction.oncomplete = resolve;
       transaction.onabort = () => reject(new Error(changed
-        ? "这张账单的关联已改变，请查看当前状态。"
-        : "撤销未写入，请重试。"));
+        ? t("这张账单的关联已改变，请查看当前状态。")
+        : t("撤销未写入，请重试。")));
     });
   }
 
@@ -541,7 +543,7 @@ const Ledger = (() => {
       };
       transaction.oncomplete = resolve;
       transaction.onabort = () => reject(new Error(changed
-        ? "转账状态已改变，请查看最新记录。" : "异常状态未保存，请重试。"));
+        ? t("转账状态已改变，请查看最新记录。") : t("异常状态未保存，请重试。")));
     });
   }
 
@@ -582,18 +584,18 @@ const Ledger = (() => {
     if (network.family === "solana") {
       const genesis = await rpc("getGenesisHash");
       if (genesis !== "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d") {
-        throw new RpcUnavailable("节点与 Solana 主网不一致。");
+        throw new RpcUnavailable(t("节点与 Solana 主网不一致。"));
       }
       return;
     }
     const chain = await rpc("eth_chainId");
     if (typeof chain !== "string" || !/^0x[0-9a-f]+$/i.test(chain) || BigInt(chain) !== BigInt(network.id)) {
-      throw new RpcUnavailable("节点链 ID 与 " + network.name + " 不一致。");
+      throw new RpcUnavailable(t("节点链 ID 与 {0} 不一致。", network.name));
     }
   }
 
   async function useNetwork(network, primary, fetchRpc, action) {
-    const unavailable = "暂时无法查询 " + network.name + " 的节点，请稍后重试。";
+    const unavailable = t("暂时无法查询 {0} 的节点，请稍后重试。", network.name);
     for (const endpoint of endpointsForNetwork(network.key, primary)) {
       const rpc = networkRpc(fetchRpc, endpoint, unavailable, network);
       try {
@@ -607,21 +609,21 @@ const Ledger = (() => {
   }
 
   async function validateEndpoint(network, url, fetchRpc) {
-    const rpc = networkRpc(fetchRpc, url, "节点无法连接，或没有允许当前网页访问。", network);
+    const rpc = networkRpc(fetchRpc, url, t("节点无法连接，或没有允许当前网页访问。"), network);
     await checkNode(rpc, network);
     if (network.family === "solana") {
       const slot = await rpc("getSlot", [{commitment: "finalized"}]);
-      if (!Number.isSafeInteger(slot)) throw new Error("节点未返回最终确认的 Solana slot。");
+      if (!Number.isSafeInteger(slot)) throw new Error(t("节点未返回最终确认的 Solana slot。"));
       return;
     }
     const block = await rpc("eth_getBlockByNumber", ["finalized", false]);
-    if (!block?.number || !hashPattern.test(block.hash)) throw new Error("节点未返回最终确认区块。");
+    if (!block?.number || !hashPattern.test(block.hash)) throw new Error(t("节点未返回最终确认区块。"));
   }
 
   async function inspectNetwork({name, id, rpc, explorer}, fetchRpc = fetch) {
     const network = customNetwork(name, Number(id), rpc, explorer);
     if (Object.values(networkCatalog()).some(item => item.id === network.id)) {
-      throw new Error("链 ID 已存在。要添加 RPC 请使用节点表单。");
+      throw new Error(t("链 ID 已存在。要添加 RPC 请使用节点表单。"));
     }
     await validateEndpoint(network, network.scanRpc, fetchRpc);
     return network;
@@ -630,22 +632,22 @@ const Ledger = (() => {
   async function inspectNode(key, address, fetchRpc = fetch) {
     const network = getNetwork(key);
     const url = nodeUrl(address);
-    if (endpointsForNetwork(key).some(other => nodeUrl(other) === url)) throw new Error("此网络已有相同的节点。");
+    if (endpointsForNetwork(key).some(other => nodeUrl(other) === url)) throw new Error(t("此网络已有相同的节点。"));
     await validateEndpoint(network, url, fetchRpc);
     return {network: key, url};
   }
 
   async function inspectAsset(key, symbol, address, fetchRpc = fetch) {
     const network = getNetwork(key);
-    if (network.family === "solana") throw new Error("自定义 ERC-20 适用于 EVM 网络。");
+    if (network.family === "solana") throw new Error(t("自定义 ERC-20 适用于 EVM 网络。"));
     const contract = normalizeAddress(address);
-    if (assetsForNetwork(key).some(item => item.contract === contract)) throw new Error("此网络已有相同的代币合约。");
+    if (assetsForNetwork(key).some(item => item.contract === contract)) throw new Error(t("此网络已有相同的代币合约。"));
     customAsset(key, symbol, contract, 0);
     return useNetwork(network, network.scanRpc, fetchRpc, async rpc => {
       const code = await rpc("eth_getCode", [contract, "finalized"]);
-      if (typeof code !== "string" || /^0x0*$/i.test(code)) throw new Error("这个地址没有已确认的合约。");
+      if (typeof code !== "string" || /^0x0*$/i.test(code)) throw new Error(t("这个地址没有已确认的合约。"));
       const result = await rpc("eth_call", [{to: contract, data: "0x313ce567"}, "finalized"]);
-      if (typeof result !== "string" || !hashPattern.test(result)) throw new Error("无法读取 ERC-20 代币精度。");
+      if (typeof result !== "string" || !hashPattern.test(result)) throw new Error(t("无法读取 ERC-20 代币精度。"));
       return customAsset(key, symbol, contract, Number(BigInt(result)));
     });
   }
@@ -666,12 +668,12 @@ const Ledger = (() => {
   async function queryTransaction(workspace, hash, fetchRpc = fetch) {
     const network = networkForWorkspace(workspace);
     const asset = assetForWorkspace(workspace);
-    if (!validTransactionId(workspace, hash)) throw new Error("交易哈希或签名格式无效。");
+    if (!validTransactionId(workspace, hash)) throw new Error(t("交易哈希或签名格式无效。"));
     hash = normalizedTransactionId(workspace, hash);
     if (network.family === "solana") {
       return useNetwork(network, network.scanRpc, fetchRpc, async rpc => {
         const transfers = await readSolanaTransaction(rpc, hash);
-        if (!transfers.length) throw new Error("交易已确认，未发现 SOL 原生转账。");
+        if (!transfers.length) throw new Error(t("交易已确认，未发现 SOL 原生转账。"));
         return transfers;
       });
     }
@@ -680,30 +682,30 @@ const Ledger = (() => {
 
   async function readReceipt(rpc, network, asset, hash) {
     const receipt = await rpc("eth_getTransactionReceipt", [hash]);
-    if (!receipt) throw new Error(network.name + " 没有找到交易回执。请核对网络、哈希或稍后重试。");
-    if (receipt.transactionHash?.toLowerCase() !== hash) throw new Error("节点返回的交易与查询不一致。");
-    if (receipt.status !== "0x1") throw new Error("这笔交易未成功。");
+    if (!receipt) throw new Error(t("{0} 没有找到交易回执。请核对网络、哈希或稍后重试。", network.name));
+    if (receipt.transactionHash?.toLowerCase() !== hash) throw new Error(t("节点返回的交易与查询不一致。"));
+    if (receipt.status !== "0x1") throw new Error(t("这笔交易未成功。"));
     const [finalized, block] = await Promise.all([
       rpc("eth_getBlockByNumber", ["finalized", false]),
       rpc("eth_getBlockByNumber", [receipt.blockNumber, false])
     ]);
     if (!finalized?.number || !block?.timestamp || !block.hash || block.hash !== receipt.blockHash) {
-      throw new Error("暂时无法确认交易所在区块，请稍后重试。");
+      throw new Error(t("暂时无法确认交易所在区块，请稍后重试。"));
     }
     if (BigInt(finalized.number) < BigInt(receipt.blockNumber)) {
-      throw new Error("交易已入块，仍在等待最终确认。请稍后重新核验。");
+      throw new Error(t("交易已入块，仍在等待最终确认。请稍后重新核验。"));
     }
     const time = new Date(Number(BigInt(block.timestamp)) * 1000).toISOString();
     if (asset.contract === "native") {
       const transaction = await rpc("eth_getTransactionByHash", [hash]);
       if (transaction?.hash?.toLowerCase() !== hash || transaction.blockHash !== receipt.blockHash ||
-        transaction.to?.toLowerCase() !== receipt.to?.toLowerCase()) throw new Error("无法核对原生转账的区块或收款地址。");
+        transaction.to?.toLowerCase() !== receipt.to?.toLowerCase()) throw new Error(t("无法核对原生转账的区块或收款地址。"));
       const payment = nativeEvmTransfer(transaction, time, network);
-      if (!payment) throw new Error("交易已确认，未发现可核验的原生 " + asset.symbol + " 转账。");
+      if (!payment) throw new Error(t("交易已确认，未发现可核验的原生 {0} 转账。", asset.symbol));
       return [payment];
     }
     const transfers = receipt.logs.filter(log => isAssetTransfer(log, asset)).map(log => unpackTransfer(log, hash, time, network, asset));
-    if (!transfers.length) throw new Error("交易已确认，未发现当前合约的 " + asset.symbol + " 转账。");
+    if (!transfers.length) throw new Error(t("交易已确认，未发现当前合约的 {0} 转账。", asset.symbol));
     return transfers;
   }
 
@@ -715,20 +717,20 @@ const Ledger = (() => {
       return useNetwork(network, network.scanRpc, fetchRpc, rpc => readSolanaAddress(rpc, normalized));
     }
     const validBlock = value => !value || /^\d{1,16}$/.test(value);
-    if (!validBlock(firstText) || !validBlock(lastText)) throw new Error("请输入十进制区块高度。");
+    if (!validBlock(firstText) || !validBlock(lastText)) throw new Error(t("请输入十进制区块高度。"));
     return useNetwork(network, network.scanRpc, fetchRpc,
       rpc => readAddress(rpc, workspace, network, asset, normalized, firstText, lastText));
   }
 
   async function readAddress(rpc, workspace, network, asset, address, firstText, lastText) {
     const finalized = await rpc("eth_getBlockByNumber", ["finalized", false]);
-    if (!finalized?.number) throw new RpcUnavailable("节点未返回最终确认区块。");
+    if (!finalized?.number) throw new RpcUnavailable(t("节点未返回最终确认区块。"));
     const top = BigInt(finalized.number);
     const end = lastText ? BigInt(lastText) : top;
     const size = asset.contract === "native" ? 20n : 1000n;
     const start = firstText ? BigInt(firstText) : end >= size ? end - size + 1n : 0n;
     if (start > end || end - start >= size || end > top) {
-      throw new Error("请输入最多 " + size + " 个区块的范围，结束高度须小于或等于 " + top + "。");
+      throw new Error(t("请输入最多 {0} 个区块的范围，结束高度须小于或等于 {1}。", size, top));
     }
     const hex = number => "0x" + number.toString(16);
     if (asset.contract === "native") {
@@ -741,13 +743,13 @@ const Ledger = (() => {
       const logs = await rpc("eth_getLogs", [{
         fromBlock: hex(first), toBlock: hex(last), address: asset.contract, topics: [transferTopic, null, recipient]
       }]);
-      if (!Array.isArray(logs)) throw new Error("节点返回的转账列表无效，请重试。");
+      if (!Array.isArray(logs)) throw new Error(t("节点返回的转账列表无效，请重试。"));
       for (const log of logs) {
         if (!isAssetTransfer(log, asset) || log.topics[2].toLowerCase() !== recipient) continue;
         if (!hashPattern.test(log.transactionHash) || !hashPattern.test(log.blockHash) ||
           !/^0x[0-9a-f]+$/i.test(log.logIndex) || !/^0x[0-9a-f]+$/i.test(log.blockNumber) ||
           BigInt(log.blockNumber) < first || BigInt(log.blockNumber) > last) {
-          throw new Error("节点返回了无法核验的日志，请重试。");
+          throw new Error(t("节点返回了无法核验的日志，请重试。"));
         }
         const number = hex(BigInt(log.blockNumber));
         if (!byBlock.has(number)) byBlock.set(number, []);
@@ -759,7 +761,7 @@ const Ledger = (() => {
     for (const [number, logs] of byBlock) {
       const block = await rpc("eth_getBlockByNumber", [number, false]);
       if (!block?.timestamp || block.number !== number || logs.some(log => log.blockHash !== block.hash)) {
-        throw new Error("无法核验转账所在区块，请重试。");
+        throw new Error(t("无法核验转账所在区块，请重试。"));
       }
       const time = new Date(Number(BigInt(block.timestamp)) * 1000).toISOString();
       for (const log of logs) {
@@ -787,7 +789,7 @@ const Ledger = (() => {
       const number = "0x" + height.toString(16);
       const block = await rpc("eth_getBlockByNumber", [number, true]);
       if (block?.number !== number || !block.timestamp || !hashPattern.test(block.hash) || !Array.isArray(block.transactions)) {
-        throw new RpcUnavailable("节点未返回完整区块。");
+        throw new RpcUnavailable(t("节点未返回完整区块。"));
       }
       const time = new Date(Number(BigInt(block.timestamp)) * 1000).toISOString();
       for (const tx of block.transactions) {
@@ -798,7 +800,7 @@ const Ledger = (() => {
         if (receipt?.status === "0x0") continue;
         if (receipt?.status !== "0x1" || receipt.blockHash !== block.hash || receipt.blockNumber !== number ||
           receipt.to?.toLowerCase() !== address || receipt.transactionHash?.toLowerCase() !== payment.hash) {
-          throw new RpcUnavailable("节点未返回有效的转账回执。");
+          throw new RpcUnavailable(t("节点未返回有效的转账回执。"));
         }
         transfers.push(payment);
       }
@@ -811,15 +813,15 @@ const Ledger = (() => {
       encoding: "jsonParsed", commitment: "finalized", maxSupportedTransactionVersion: 1
     }]);
     if (!transaction || transaction.transaction?.signatures?.[0] !== signature || !transaction.meta) {
-      throw new RpcUnavailable("节点未返回可核验的 Solana 交易。");
+      throw new RpcUnavailable(t("节点未返回可核验的 Solana 交易。"));
     }
     if (transaction.meta.err) {
       if (address) return [];
-      throw new Error("这笔 Solana 交易未成功。");
+      throw new Error(t("这笔 Solana 交易未成功。"));
     }
-    if (!Number.isSafeInteger(transaction.blockTime)) throw new RpcUnavailable("节点未返回交易时间。");
+    if (!Number.isSafeInteger(transaction.blockTime)) throw new RpcUnavailable(t("节点未返回交易时间。"));
     const instructions = transaction.transaction.message?.instructions;
-    if (!Array.isArray(instructions)) throw new RpcUnavailable("节点未返回已解码的交易指令。");
+    if (!Array.isArray(instructions)) throw new RpcUnavailable(t("节点未返回已解码的交易指令。"));
     const inner = new Map((transaction.meta.innerInstructions ?? []).map(row => [row.index, row.instructions]));
     const ordered = instructions.flatMap((instruction, index) => [instruction, ...(inner.get(index) ?? [])]);
     const time = new Date(transaction.blockTime * 1000).toISOString();
@@ -829,10 +831,10 @@ const Ledger = (() => {
         !["transfer", "transferWithSeed"].includes(parsed?.type)) return [];
       const {destination, lamports, source} = parsed.info ?? {};
       if (source === destination || (address && destination !== address)) return [];
-      if (!validBase58(destination, 32)) throw new RpcUnavailable("节点未返回有效的收款地址。");
+      if (!validBase58(destination, 32)) throw new RpcUnavailable(t("节点未返回有效的收款地址。"));
       const amount = typeof lamports === "string" && /^\d+$/.test(lamports) ? BigInt(lamports)
         : Number.isSafeInteger(lamports) ? BigInt(lamports) : -1n;
-      if (amount < 0n || amount >= 2n ** 64n) throw new RpcUnavailable("节点返回的 SOL 金额无法精确读取。");
+      if (amount < 0n || amount >= 2n ** 64n) throw new RpcUnavailable(t("节点返回的 SOL 金额无法精确读取。"));
       return amount === 0n ? [] : [{
         hash: signature, index, address: destination, units: amount.toString(), time,
         demo: false, network: "solana", asset: "native"
@@ -842,7 +844,7 @@ const Ledger = (() => {
 
   async function readSolanaAddress(rpc, address) {
     const signatures = await rpc("getSignaturesForAddress", [address, {limit: 10, commitment: "finalized"}]);
-    if (!Array.isArray(signatures)) throw new RpcUnavailable("节点未返回地址交易列表。");
+    if (!Array.isArray(signatures)) throw new RpcUnavailable(t("节点未返回地址交易列表。"));
     const success = signatures.filter(item => !item.err && validBase58(item.signature, 64));
     const transfers = [];
     for (const {signature} of success) {
@@ -852,6 +854,10 @@ const Ledger = (() => {
   }
 
   const headers = ["账单号", "客户", "金额", "收款地址"];
+  const csvHeaders = localization.supported.map(language => {
+    const translate = localization.translator(language, localization.messages);
+    return headers.map(header => translate(header));
+  });
 
   function csvField(value) {
     let field = String(value ?? "");
@@ -870,7 +876,7 @@ const Ledger = (() => {
     const fields = /(?:"((?:[^"]|"")*)"|([^",\r\n]*))(,|\r\n|\n|\r|$)/y;
     while (fields.lastIndex < csv.length) {
       const match = fields.exec(csv);
-      if (!match) throw new Error("CSV 格式有误。请检查字段引号和分隔符。");
+      if (!match) throw new Error(t("CSV 格式有误。请检查字段引号和分隔符。"));
       row.push(match[1] === undefined ? match[2] : match[1].replaceAll('""', '"'));
       if (match[3] === ",") continue;
       if (row.some(value => value.trim())) records.push(row);
@@ -878,16 +884,17 @@ const Ledger = (() => {
     }
     if (row.length) records.push([...row, ""]);
     const header = records.shift();
-    if (!header || header.length !== headers.length || !headers.every((name, index) => header[index].trim() === name)) {
-      throw new Error("CSV 列顺序须为：账单号、客户、金额、收款地址。");
+    if (!header || header.length !== headers.length ||
+      !csvHeaders.some(names => names.every((name, index) => header[index].trim() === name))) {
+      throw new Error(t("CSV 列顺序须为：账单号、客户、金额、收款地址。"));
     }
-    if (!records.length || records.length > 1000) throw new Error("每次可导入 1 至 1000 张账单。");
+    if (!records.length || records.length > 1000) throw new Error(t("每次可导入 1 至 1000 张账单。"));
     return records.map((record, index) => {
       try {
-        if (record.length !== headers.length) throw new Error("字段数量有误。");
+        if (record.length !== headers.length) throw new Error(t("字段数量有误。"));
         return bill(mode, record);
       } catch (error) {
-        throw new Error("第 " + (index + 1) + " 条账单：" + error.message);
+        throw new Error(t("第 {0} 条账单：{1}", index + 1, error.message));
       }
     });
   }
