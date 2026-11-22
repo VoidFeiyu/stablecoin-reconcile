@@ -1,6 +1,6 @@
 # Chain Ledger
 
-[简体中文](README.md) · [繁體中文](README.zh-Hant.md) · English
+[简体中文](README.md) · [繁體中文](README.zh-Hant.md) · English · [日本語](README.ja.md) · [한국어](README.ko.md) · [Español](README.es.md)
 
 Chain Ledger is an open-source reconciliation tool for individuals and small teams that accept crypto payments. Receive funds in your existing wallet, then verify transfers, match invoices, and export records in a browser.
 
@@ -14,11 +14,11 @@ python -m http.server 8080 --bind 127.0.0.1
 
 Open `http://127.0.0.1:8080/`. Go to **Verification** and select **Try split-payment sample** to match two demo transfers to one invoice and see how its outstanding balance changes.
 
-Use the language menu to choose Simplified Chinese, Traditional Chinese, or English. The browser remembers your selection. Payment links and downloaded payment pages open in the language selected when you generated them.
+Use the language menu to choose Simplified Chinese, Traditional Chinese, English, Japanese, Korean, or Spanish. The browser remembers your selection. Payment links and downloaded payment pages open in the language selected when you generated them.
 
 ## Features
 
-- Create invoices, import or export CSV files, and generate downloadable payment pages. CSV import accepts templates in all three languages.
+- Create invoices, import or export CSV files, and generate downloadable payment pages. CSV import accepts templates in all six languages.
 - Search by invoice ID, customer, or receiving address, and filter for partially paid or overpaid invoices. Edit customer names at any time, and change the amount or receiving address before linking a payment.
 - Verify transactions by hash or signature in batches, or search for recent payments by receiving address.
 - Track split payments and overpayments, unlink an individual payment, record exceptions, and review recent activity.

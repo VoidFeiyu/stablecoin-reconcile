@@ -193,11 +193,14 @@ const Payment = (() => {
     const payload = encode(request);
     const language = localization.choose(request.language ?? localization.language);
     const translate = localization.translator(language, localization.messages);
-    const catalog = JSON.stringify(localization.messages).replaceAll("<", "\\u003c");
+    const index = localization.catalogLanguages.indexOf(language);
+    const messages = index < 0 ? {} : Object.fromEntries(Object.entries(localization.messages)
+      .map(([key, translations]) => [key, [translations[index]]]));
+    const catalog = JSON.stringify(messages).replaceAll("<", "\\u003c");
     return '<!doctype html><html lang="' + language + '"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
       '<title>' + translate("付款账单") + '</title><style>' + style + '</style><main id="payer"></main><script>' +
       'const language = "' + language + '";' +
-      'const t = (' + localization.translator.toString() + ')(language, ' + catalog + ');' +
+      'const t = (' + localization.translator.toString() + ')(language, ' + catalog + ', [language]);' +
       'const request = (' + decode.toString() + ')("' + payload + '", t);' +
       '(' + payer.toString() + ')(document.getElementById("payer"), request, ' + encode.toString() + ', ' +
       copyText.toString() + ', ' + validSolanaValue.toString() + ', t, ' + localization.apply.toString() + ', language);<\/script></html>';
