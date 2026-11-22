@@ -1,0 +1,10 @@
+.openai/
+.env
+.env.*
+node_modules/
+data/
+backups/
+*-备份-*.json
+*-对账.csv
+演示对账.csv
+付款账单-*.html

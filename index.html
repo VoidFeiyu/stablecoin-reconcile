@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="核验多链稳定币收款，匹配账单并导出对账记录。">
+  <title>链上对账台 1.4 · 多链收款</title>
+  <link rel="stylesheet" href="./style.css">
+  <script defer src="./ledger.js"></script>
+  <script defer src="./backup.js"></script>
+  <script defer src="./payment.js"></script>
+  <script defer src="./app.js"></script>
+</head>
+<body>
+  <aside class="rail">
+    <a class="brand" href="#invoices"><span class="mark" aria-hidden="true">▰<br>▰</span><span>链上对账台<small>多链收款工作台</small></span></a>
+    <p class="rail-label">工作区</p>
+    <nav aria-label="工作区"><a href="#invoices" aria-current="page"><span aria-hidden="true">▤</span>账单对账</a><a href="#verify"><span aria-hidden="true">◎</span>交易核验</a></nav>
+    <div class="rail-footer"><span class="network-dot"></span><span id="rail-network">Base</span><span class="rail-asset asset-symbol">USDC</span></div>
+  </aside>
+  <main>
+    <div class="top">
+      <span class="crumb">工作区 <span class="crumb-divider">/</span> <span id="page-crumb">账单对账</span></span>
+      <div class="top-controls">
+        <div class="network-control"><label for="network-select">网络</label><select id="network-select"></select></div>
+        <div class="network-control"><label for="asset-select">币种</label><select id="asset-select"></select></div>
+        <div class="switch" role="group" aria-label="工作模式"><button type="button" data-mode="demo" aria-pressed="true">演示模式</button><button type="button" data-mode="live" aria-pressed="false">链上模式</button></div>
+      </div>
+    </div>
+    <div class="asset-shortcuts" role="group" aria-label="常用币种">
+      <button type="button" class="button compact" data-network="ethereum" data-asset="0xdac17f958d2ee523a2206206994597c13d831ec7" aria-pressed="false">USDT</button>
+      <button type="button" class="button compact" data-network="bsc" data-asset="native" aria-pressed="false">BNB</button>
+      <button type="button" class="button compact" data-network="solana" data-asset="native" aria-pressed="false">SOL</button>
+    </div>
+    <header class="heading">
+      <div><h1 id="page-title">账单对账</h1><p id="page-description">管理账单、查看已收和待收金额，导出对账记录。</p></div>
+      <div class="heading-actions"><button type="button" id="network-settings" class="button">网络与币种</button><button type="button" id="workspace-settings" class="button">备份与记录</button><button type="button" id="import" class="button">导入 CSV</button><button type="button" id="new" class="button primary">＋ 新建账单</button></div>
+    </header>
+    <div class="notice" id="mode-info"></div>
+    <section class="stats" id="invoice-stats" aria-label="账单概览">
+      <div class="stat"><span>账单应收</span><strong id="total">0</strong><small class="asset-symbol">USDC</small></div>
+      <div class="stat"><span>尚待收款</span><strong id="open-total">0</strong><small class="asset-symbol">USDC</small></div>
+      <div class="stat"><span>已收金额</span><strong id="paid-total">0</strong><small class="asset-symbol">USDC</small></div>
+      <div class="stat"><span>多收金额</span><strong id="overpaid-total">0</strong><small class="asset-symbol">USDC</small></div>
+    </section>
+    <div class="workspace">
+      <section class="panel invoices" id="invoice-panel">
+        <div class="panel-heading"><div><h2>账单列表</h2><p id="count"></p></div><button type="button" id="export" class="button compact">导出 CSV</button></div>
+        <div class="tabs" role="group" aria-label="按状态筛选"><button data-filter="all" aria-pressed="true">全部</button><button data-filter="open" aria-pressed="false">待收</button><button data-filter="paid" aria-pressed="false">已结清</button></div>
+        <div class="table-scroll"><table><thead><tr><th>账单 / 客户</th><th>金额 (<span class="asset-symbol">USDC</span>)</th><th>状态</th><th><span class="sr-only">操作</span></th></tr></thead><tbody id="rows"></tbody></table></div>
+      </section>
+      <section class="panel verify" id="verification-panel" aria-label="交易核验操作" hidden>
+        <div class="tabs verification-tabs" role="group" aria-label="收款核验视图">
+          <button type="button" data-view="batch" aria-pressed="true">核验交易</button>
+          <button type="button" data-view="inbox" aria-pressed="false">待匹配入账 <span id="inbox-count">0</span></button>
+          <button type="button" data-view="exceptions" aria-pressed="false">异常 <span id="exceptions-count">0</span></button>
+        </div>
+        <div id="batch-controls">
+          <form id="verify-form">
+            <label for="hash" id="hash-label">交易哈希</label>
+            <p id="hash-help" class="feedback">粘贴付款凭证，或逐行输入最多 10 个交易哈希。</p>
+            <textarea id="hash" rows="3" maxlength="4000" placeholder="0x…" aria-describedby="hash-help" spellcheck="false" autocomplete="off" required></textarea>
+            <button id="check" type="submit" class="button primary">核验交易</button>
+            <div id="examples" class="examples">
+              <button id="example" type="button" class="text-btn">填入并核验样例</button>
+              <button id="batch-example" type="button" class="text-btn">试用批量样例</button>
+              <button id="split-example" type="button" class="text-btn">试用分笔样例</button>
+            </div>
+          </form>
+          <details class="address-lookup">
+            <summary>按收款地址查入账</summary>
+            <form id="lookup-form">
+              <label for="lookup-address" id="lookup-address-label">Base 收款地址</label>
+              <input id="lookup-address" inputmode="text" required maxlength="44" placeholder="0x…" spellcheck="false" autocomplete="off">
+              <div id="lookup-range" class="lookup-range">
+                <label>起始区块<input id="lookup-start" inputmode="numeric" pattern="[0-9]+" maxlength="16" placeholder="选填"></label>
+                <label>结束区块<input id="lookup-end" inputmode="numeric" pattern="[0-9]+" maxlength="16" placeholder="最新最终确认区块"></label>
+              </div>
+              <p class="feedback lookup-tip">主网每次最多查询 1,000 个最终确认区块。</p>
+              <button type="submit" class="button">查询入账</button>
+            </form>
+          </details>
+          <p id="check-status" class="feedback" role="status"></p>
+          <ul id="check-failures" class="check-failures"></ul>
+        </div>
+        <p id="inbox-info" class="feedback" hidden></p>
+        <div id="batch-match"></div>
+        <div id="transfers"></div>
+        <button type="button" id="inbox-more" class="button compact" hidden>显示更多</button>
+      </section>
+    </div>
+    <p id="message" class="message" role="status" hidden></p>
+  </main>
+  <dialog id="bill-dialog">
+    <form id="bill-form">
+      <div class="dialog-title"><h2>新建账单</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+      <label>账单号<input name="id" maxlength="40" placeholder="例如 INV-1045" required></label>
+      <label>客户<input name="customer" maxlength="80" required></label>
+      <label>金额 (<span class="asset-symbol">USDC</span>)<input name="amount" inputmode="decimal" maxlength="335" placeholder="例如 500.00" required></label>
+      <label>收款地址<input name="address" maxlength="44" placeholder="0x…" autocomplete="off" spellcheck="false" required></label>
+      <p class="feedback" role="status"></p>
+      <button class="button primary" type="submit">保存账单</button>
+    </form>
+  </dialog>
+  <dialog id="import-dialog">
+    <form id="import-form">
+      <div class="dialog-title"><h2>导入账单</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+      <p>使用 UTF-8 CSV 文件，列名为「账单号、客户、金额、收款地址」。</p>
+      <button type="button" id="template" class="text-btn">下载 CSV 模板</button>
+      <label>CSV 文件<input type="file" accept=".csv,text/csv" name="file" required></label>
+      <p class="feedback" role="status"></p>
+      <button class="button primary" type="submit">导入账单</button>
+    </form>
+  </dialog>
+  <dialog id="undo-dialog">
+    <form id="undo-form">
+      <div class="dialog-title"><h2>撤销付款关联</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+      <p id="undo-details"></p>
+      <label for="undo-payment">选择要撤销的一笔付款</label>
+      <select id="undo-payment" required></select>
+      <div id="undo-explorer"></div>
+      <p class="feedback" role="status"></p>
+      <div class="dialog-actions">
+        <button type="button" class="button" data-close autofocus>取消</button>
+        <button class="button primary" type="submit">确认撤销</button>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="payment-dialog">
+    <div class="dialog-title"><h2>分享付款账单</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+    <p id="payment-summary"></p>
+    <p>把付款页发给客户。客户付款后可复制凭证发回给你。</p>
+    <div class="payment-actions">
+      <button class="button primary" type="button" id="download-payment">下载付款页</button>
+      <button class="button" type="button" id="copy-payment-link" hidden>复制付款链接</button>
+    </div>
+    <p class="feedback" id="payment-status" role="status"></p>
+  </dialog>
+  <dialog id="exception-dialog">
+    <form id="exception-form">
+      <div class="dialog-title"><h2>记录异常</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+      <p id="exception-details"></p>
+      <label>处理说明<input name="reason" required maxlength="160" placeholder="例如：金额不足，等待补款"></label>
+      <p class="feedback" role="status"></p>
+      <button class="button primary" type="submit">保存异常</button>
+    </form>
+  </dialog>
+  <dialog id="backup-dialog" class="backup-dialog">
+    <form id="backup-form">
+      <div class="dialog-title"><h2>备份与记录</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+      <button type="button" id="download-backup" class="button">导出链上备份</button>
+      <p id="backup-help"></p>
+      <label>链上备份文件<input type="file" accept=".json,application/json" name="backup" required></label>
+      <button class="button" type="submit">恢复备份</button>
+      <p class="feedback" role="status"></p>
+    </form>
+    <section class="activity-panel">
+      <h3 id="activity-title">最近操作</h3>
+      <ol id="activity-log"></ol>
+    </section>
+  </dialog>
+  <dialog id="settings-dialog" class="settings-dialog">
+    <div class="dialog-title"><h2>网络与币种</h2><button type="button" class="icon-btn" data-close aria-label="关闭">×</button></div>
+    <p>自定义配置保存在当前浏览器。查询会发送给所选网络的 RPC 节点。</p>
+    <details class="settings-section" open>
+      <summary>RPC 节点</summary>
+      <form id="custom-node">
+        <label>网络<select class="settings-network" name="network" required></select></label>
+        <ul id="rpc-nodes"></ul>
+        <label>RPC 地址<input name="url" type="url" placeholder="https://…" autocomplete="off" required></label>
+        <button type="submit" class="button">验证并添加节点</button>
+        <p role="status" class="feedback"></p>
+      </form>
+    </details>
+    <details class="settings-section">
+      <summary>添加币种</summary>
+      <form id="custom-asset">
+        <label>网络<select class="settings-network" name="network" required></select></label>
+        <label>币种简称<input name="symbol" maxlength="14" placeholder="例如 USDT" required></label>
+        <label>ERC-20 合约地址<input name="address" maxlength="42" placeholder="0x…" spellcheck="false" autocomplete="off" required></label>
+        <button type="submit" class="button">验证合约并添加币种</button>
+        <p role="status" class="feedback"></p>
+      </form>
+    </details>
+    <details class="settings-section">
+      <summary>添加网络</summary>
+      <form id="custom-network">
+        <label>网络名称<input name="name" maxlength="40" required></label>
+        <label>EVM 链 ID<input name="id" inputmode="numeric" pattern="[0-9]+" placeholder="十进制" required></label>
+        <label>RPC 地址<input name="rpc" type="url" placeholder="https://…" autocomplete="off" required></label>
+        <label>区块链浏览器（选填）<input name="explorer" type="url" placeholder="https://…"></label>
+        <button type="submit" class="button">验证链 ID 并添加网络</button>
+        <p role="status" class="feedback"></p>
+      </form>
+    </details>
+  </dialog>
+</body>
+</html>
